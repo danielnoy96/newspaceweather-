@@ -9,8 +9,15 @@
   <body>
     <div id="controls">
       <h2 id="fps">FPS: </h2>
+      <h5 id="times"></h5>
       <input type="text" placeholder="Particle Amount" id="particle-amount">
       <button id="newSimBtn">New Sim</button>
+      <div style="height: 7.5px"></div>
+      <select name="engine" id="engine">
+        <option value="countingSort">Counting Sort</option>
+        <option value="linkedList">Atomic Linked Lists</option>
+        <option value="nSquared">NSquared</option>
+      </select>
       <h2>Controls</h2>
       <p>
         Left mouse down - attract particles <br>

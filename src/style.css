@@ -7,6 +7,7 @@
 
 body {
   font-family: font;
+  background-color: black;
 }
 
 canvas {
@@ -53,6 +54,14 @@ h2 {
   text-shadow: 0 2px grey, 0 0 4px black, 0 2px 4px black;
 }
 
+h5 {
+  font-size: 15px;
+  text-shadow: 0 1.5px grey, 0 0 3px black, 0 1.5px 3px black;
+  line-height: 18px;
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
 p {
   font-size: 15px;
   text-shadow: 0 1.5px grey, 0 0 3px black, 0 1.5px 3px black;
@@ -60,7 +69,7 @@ p {
   margin-bottom: 0;
 }
 
-input {
+#particle-amount {
   font-family: font;
   background-color: rgba(50, 50, 50, 0.5);
   border: 2px solid rgba(255, 255, 255, 0.75);
@@ -85,4 +94,13 @@ button:hover {
 
 button:active {
   scale: 0.85;
+}
+
+select {
+  width: 100%;
+  border-radius: 10px;
+  font-family: font;
+  background-color: rgba(50, 50, 50, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  color: white;
 }

@@ -1,0 +1,210 @@
+export function hslToRgb(
+  h: number,
+  s: number,
+  l: number,
+): [number, number, number] {
+  // Ensure h is in [0, 360), s and l are in [0, 1]
+  h = ((h % 360) + 360) % 360;
+  s = Math.max(0, Math.min(1, s));
+  l = Math.max(0, Math.min(1, l));
+
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+
+  let r = 0,
+    g = 0,
+    b = 0;
+
+  if (h < 60) {
+    r = c;
+    g = x;
+    b = 0;
+  } else if (h < 120) {
+    r = x;
+    g = c;
+    b = 0;
+  } else if (h < 180) {
+    r = 0;
+    g = c;
+    b = x;
+  } else if (h < 240) {
+    r = 0;
+    g = x;
+    b = c;
+  } else if (h < 300) {
+    r = x;
+    g = 0;
+    b = c;
+  } else {
+    r = c;
+    g = 0;
+    b = x;
+  }
+
+  return [r + m, g + m, b + m];
+}
+
+export async function logBufferf32(
+  device: GPUDevice,
+  buffer: GPUBuffer,
+  size: number,
+) {
+  const readbackBuffer = device.createBuffer({
+    size: size,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+
+  const commandEncoder = device.createCommandEncoder();
+  commandEncoder.copyBufferToBuffer(buffer, 0, readbackBuffer, 0, size);
+
+  device.queue.submit([commandEncoder.finish()]);
+
+  await readbackBuffer.mapAsync(GPUMapMode.READ);
+
+  const arrayBuffer = readbackBuffer.getMappedRange();
+
+  const outputData = new Float32Array(arrayBuffer);
+
+  console.log(outputData.slice());
+
+  readbackBuffer.unmap();
+  readbackBuffer.destroy();
+}
+
+export async function logBufferu32(
+  device: GPUDevice,
+  buffer: GPUBuffer,
+  size: number,
+) {
+  const readbackBuffer = device.createBuffer({
+    size: size,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+
+  const commandEncoder = device.createCommandEncoder();
+  commandEncoder.copyBufferToBuffer(buffer, 0, readbackBuffer, 0, size);
+
+  device.queue.submit([commandEncoder.finish()]);
+
+  await readbackBuffer.mapAsync(GPUMapMode.READ);
+
+  const arrayBuffer = readbackBuffer.getMappedRange();
+
+  const outputData = new Uint32Array(arrayBuffer);
+
+  console.log(outputData.slice());
+
+  readbackBuffer.unmap();
+  readbackBuffer.destroy();
+}
+
+let canTimestamp = false;
+const timestamps: Record<
+  string,
+  {
+    querySet: GPUQuerySet;
+    resolveBuffer: GPUBuffer;
+    resultBuffer: GPUBuffer;
+    v: number;
+  }
+> = {};
+
+export async function requestTimestamps(adapter: GPUAdapter) {
+  canTimestamp = adapter.features.has('timestamp-query');
+  if (canTimestamp) {
+    return await adapter.requestDevice({
+      requiredFeatures: ['timestamp-query'],
+    });
+  } else {
+    return await adapter.requestDevice();
+  }
+}
+
+export function setupTimestamp(device: GPUDevice, name: string) {
+  if (!canTimestamp) return;
+  timestamps[name] = {
+    querySet: device.createQuerySet({
+      type: 'timestamp',
+      count: 2,
+    }),
+    resolveBuffer: device.createBuffer({
+      size: 2 * 8,
+      usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+    }),
+    resultBuffer: device.createBuffer({
+      size: 2 * 8,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    }),
+    v: 0,
+  };
+}
+
+export function linkComputeTimestamp(name: string): GPUComputePassDescriptor {
+  if (!canTimestamp) {
+    return {};
+  }
+  return {
+    timestampWrites: {
+      querySet: timestamps[name].querySet,
+      beginningOfPassWriteIndex: 0,
+      endOfPassWriteIndex: 1,
+    },
+  };
+}
+
+export function linkRenderTimestamp(
+  description: GPURenderPassDescriptor,
+  name: string,
+): GPURenderPassDescriptor {
+  if (!canTimestamp) {
+    return description;
+  }
+  return {
+    ...description,
+    timestampWrites: {
+      querySet: timestamps[name].querySet,
+      beginningOfPassWriteIndex: 0,
+      endOfPassWriteIndex: 1,
+    },
+  };
+}
+
+export function resolveTimestamp(
+  commandEncoder: GPUCommandEncoder,
+  name: string,
+) {
+  if (!canTimestamp) return;
+  commandEncoder.resolveQuerySet(
+    timestamps[name].querySet,
+    0,
+    timestamps[name].querySet.count,
+    timestamps[name].resolveBuffer,
+    0,
+  );
+  if (timestamps[name].resultBuffer.mapState == 'unmapped') {
+    commandEncoder.copyBufferToBuffer(
+      timestamps[name].resolveBuffer,
+      0,
+      timestamps[name].resultBuffer,
+      0,
+      timestamps[name].resultBuffer.size,
+    );
+  }
+}
+
+export async function readTimestamp(name: string) {
+  if (!canTimestamp || timestamps[name].resultBuffer.mapState != 'unmapped')
+    return timestamps[name].v;
+
+  await timestamps[name].resultBuffer.mapAsync(GPUMapMode.READ);
+
+  const times = new BigUint64Array(
+    timestamps[name].resultBuffer.getMappedRange(),
+  );
+
+  timestamps[name].v = Number(times[1] - times[0]) / 1000 / 1000; // ms
+  timestamps[name].resultBuffer.unmap();
+
+  return timestamps[name].v;
+}

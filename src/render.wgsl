@@ -29,7 +29,7 @@ fn vertex(
         vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)
     );
 
-    let offset = positions[vertexIndex] * 0.005;
+    let offset = positions[vertexIndex] * 0.005 / 2;
     let worldPos = particle.pos + offset;
 
     var output: VertexOutput;

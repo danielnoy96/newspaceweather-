@@ -1,21 +1,51 @@
+// import { GUI } from 'dat.gui';
+
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
-import computeShader from './compute.wgsl?raw';
+const timesDisplay = document.getElementById('times') as HTMLHeadingElement;
+
 import { mouse } from './input';
 import renderShaders from './render.wgsl?raw';
+import {
+  hslToRgb,
+  linkRenderTimestamp,
+  readTimestamp,
+  requestTimestamps,
+  resolveTimestamp,
+  setupTimestamp,
+} from './utils';
 
 const uniformsSize = 8;
 const uniformData = new Float32Array(uniformsSize);
-const workgroupSize = 64;
 
-const simSize = 6;
+const simSize = 8;
 const simData = new Float32Array(simSize);
 
 const dt = 0.02;
-const rMax = 0.4;
-const forceFactor = 1;
-const beta = 0.1;
+const rMax = 0.4 / 4;
+const forceFactor = 1 * 4 * 2;
+const beta = 0.2;
 const frictionHalfLife = 0.04;
+
+const times: Record<string, Record<string, string>> = {
+  nSquared: {
+    'gpu time': '',
+  },
+  linkedList: {
+    'construct time': '',
+    'sim time': '',
+  },
+  countingSort: {
+    'cell time': '',
+    'prefix time': '',
+    'sort time': '',
+    'sim time': '',
+  },
+  general: {
+    'cpu time': '',
+    'render time': '',
+  },
+};
 
 function makeRandomMatrix() {
   const rows = [];
@@ -29,32 +59,25 @@ function makeRandomMatrix() {
   return rows;
 }
 
-const colourAmt = 10;
-const colours = [
-  [1, 0, 0],
-  [0, 1, 0],
-  [0, 0, 1],
-  [1, 1, 0],
-  [0, 1, 1],
-  [1, 0, 1],
-  [1, 0.5, 0],
-  [0, 0.5, 1],
-  [0.5, 0, 1],
-  [0.5, 1, 0],
-];
+const colourAmt = 50;
+const colours: [number, number, number][] = [];
+for (let i = 0; i < colourAmt; i++) {
+  colours.push(hslToRgb((i / colourAmt) * 360, 1, 0.5));
+}
 let matrix = makeRandomMatrix();
 
 const particleStride = 24;
 
 const multistep = 1;
 
-let particleAmt = 5000;
+const cellAmt = 2000;
+
+let particleAmt = 10000;
 
 let device: GPUDevice | undefined;
 let context: GPUCanvasContext | undefined;
 let uniformBuffer: GPUBuffer | undefined;
 let simBuffer: GPUBuffer | undefined;
-let pipeline: GPUComputePipeline | undefined;
 let renderPipeline: GPURenderPipeline | undefined;
 
 let matrixBuffer: GPUBuffer | undefined;
@@ -62,11 +85,38 @@ let colourBuffer: GPUBuffer | undefined;
 
 let particleBuffers: [GPUBuffer, GPUBuffer] | undefined;
 
-let bindGroups: [GPUBindGroup, GPUBindGroup] | undefined;
 let renderBindGroup: GPUBindGroup | undefined;
 
 let alternate = 0;
 let fpsc = 0;
+
+import * as nSquared from './nSquared/main';
+import * as linkedList from './linkedList/main';
+import * as countingSort from './countingSort/main';
+
+const engines: Record<
+  string,
+  typeof nSquared | typeof linkedList | typeof countingSort
+> = {
+  nSquared,
+  linkedList,
+  countingSort,
+};
+
+let engine: string = 'countingSort';
+
+// const test = {
+//   one: 123,
+//   two: 345,
+//   three: 'testing123',
+// };
+
+// const gui = new GUI();
+// const cubeFolder = gui.addFolder('Cube');
+// cubeFolder.add(test, 'one');
+// cubeFolder.add(test, 'two');
+// cubeFolder.add(test, 'three');
+// cubeFolder.open();
 
 (async () => {
   const adapter = await navigator.gpu.requestAdapter({
@@ -75,7 +125,7 @@ let fpsc = 0;
 
   if (!adapter) return;
 
-  device = await adapter.requestDevice();
+  device = await requestTimestamps(adapter);
   context = canvas.getContext('webgpu') ?? undefined;
 
   if (!context) return;
@@ -89,26 +139,20 @@ let fpsc = 0;
   uniformBuffer = device.createBuffer({
     size: uniformsSize * 4,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    label: 'uniformBuffer',
   });
 
   simBuffer = device.createBuffer({
     size: simSize * 4,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    label: 'simBuffer',
   });
 
   //
 
-  const module = device.createShaderModule({
-    code: computeShader,
-  });
-
-  pipeline = device.createComputePipeline({
-    layout: 'auto',
-    compute: {
-      module,
-      entryPoint: 'main',
-    },
-  });
+  for (const engine in engines) {
+    engines[engine].setup(device);
+  }
 
   const renderModule = device.createShaderModule({ code: renderShaders });
 
@@ -146,18 +190,13 @@ let fpsc = 0;
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
+  setupTimestamp(device, 'render');
+
   startParticles();
 })();
 
 function tick(commandEncoder: GPUCommandEncoder) {
-  if (!device || !pipeline || !bindGroups) return;
-
-  const passEncoder = commandEncoder.beginComputePass();
-  passEncoder.setPipeline(pipeline);
-  passEncoder.setBindGroup(0, bindGroups[alternate]);
-  passEncoder.dispatchWorkgroups(Math.ceil(particleAmt / workgroupSize));
-  passEncoder.end();
-
+  engines[engine].tick(commandEncoder, alternate, particleAmt);
   alternate = (alternate + 1) % 2;
 }
 
@@ -175,17 +214,20 @@ function render(context: GPUCanvasContext, commandEncoder: GPUCommandEncoder) {
     ],
   };
 
-  const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+  const passEncoder = commandEncoder.beginRenderPass(
+    linkRenderTimestamp(renderPassDescriptor, 'render'),
+  );
   passEncoder.setPipeline(renderPipeline);
   passEncoder.setVertexBuffer(0, particleBuffers[(alternate + 1) % 2]);
   passEncoder.setBindGroup(0, renderBindGroup);
   passEncoder.draw(6, particleAmt, 0, 0);
   passEncoder.end();
+
+  resolveTimestamp(commandEncoder, 'render');
 }
 
 function startParticles() {
-  if (!device || !pipeline || !uniformBuffer || !renderPipeline || !simBuffer)
-    return;
+  if (!device || !uniformBuffer || !renderPipeline || !simBuffer) return;
 
   const bufferSize = particleAmt * particleStride;
   particleBuffers = [
@@ -207,17 +249,39 @@ function startParticles() {
 
   alternate = 0;
   const data = new Float32Array(bufferSize / 4);
-  for (let i = 0; i < particleAmt; i++) {
-    data[i * 6] = Math.random() * 2 - 1;
-    data[i * 6 + 1] = Math.random() * 2 - 1;
-    data[i * 6 + 2] = 0;
-    data[i * 6 + 3] = 0;
-    data[i * 6 + 4] = Math.floor(Math.random() * colourAmt);
+  let pi = 0;
+  while (pi < particleAmt) {
+    const spawnAmt = ((Math.random() * (particleAmt - pi)) / colourAmt) * 5;
+    const c = Math.floor(Math.random() * colourAmt);
 
-    data[i * 6 + 5] = 0;
-    // data[i * 8 + 6] = 0;
-    // data[i * 8 + 7] = 0;
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.random() * 0.9;
+
+    const x = Math.cos(a) * d;
+    const y = Math.sin(a) * d;
+    for (let i = 0; i < spawnAmt; i++) {
+      data[pi * 6] = x + (Math.random() * 2 - 1) ** 3 / 10;
+      data[pi * 6 + 1] = y + (Math.random() * 2 - 1) ** 3 / 10;
+      data[pi * 6 + 2] = 0;
+      data[pi * 6 + 3] = 0;
+      data[pi * 6 + 4] = c;
+
+      data[pi * 6 + 5] = 0;
+
+      pi++;
+    }
   }
+  // for (let i = 0; i < particleAmt; i++) {
+  //   data[i * 6] = Math.random() * 2 - 1;
+  //   data[i * 6 + 1] = Math.random() * 2 - 1;
+  //   data[i * 6 + 2] = 0;
+  //   data[i * 6 + 3] = 0;
+  //   data[i * 6 + 4] = Math.floor(Math.random() * colourAmt);
+
+  //   data[i * 6 + 5] = 0;
+  //   // data[i * 8 + 6] = 0;
+  //   // data[i * 8 + 7] = 0;
+  // }
 
   device.queue.writeBuffer(particleBuffers[0], 0, data.buffer);
 
@@ -227,6 +291,8 @@ function startParticles() {
   simData[3] = forceFactor;
   simData[4] = Math.pow(0.5, dt / frictionHalfLife);
   simData[5] = dt;
+  simData[6] = rMax * 2;
+  simData[7] = cellAmt;
   device.queue.writeBuffer(simBuffer, 0, simData);
 
   matrixBuffer = device.createBuffer({
@@ -253,47 +319,17 @@ function startParticles() {
   }
   device.queue.writeBuffer(colourBuffer, 0, colourData.buffer);
 
-  const groups = [];
-  for (let i = 0; i < 2; i++) {
-    groups.push(
-      device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          {
-            binding: 0,
-            resource: {
-              buffer: uniformBuffer,
-            },
-          },
-          {
-            binding: 1,
-            resource: {
-              buffer: simBuffer,
-            },
-          },
-          {
-            binding: 2,
-            resource: {
-              buffer: matrixBuffer,
-            },
-          },
-          {
-            binding: 3,
-            resource: {
-              buffer: particleBuffers[i],
-            },
-          },
-          {
-            binding: 4,
-            resource: {
-              buffer: particleBuffers[1 - i],
-            },
-          },
-        ],
-      }),
+  for (const engine in engines) {
+    engines[engine].start(
+      device,
+      uniformBuffer,
+      simBuffer,
+      matrixBuffer,
+      particleBuffers,
+      particleAmt,
+      cellAmt,
     );
   }
-  bindGroups = [groups[0], groups[1]];
 
   renderBindGroup = device.createBindGroup({
     layout: renderPipeline.getBindGroupLayout(0),
@@ -317,6 +353,8 @@ function startParticles() {
 function update() {
   requestAnimationFrame(update);
   if (!device || !context) return;
+
+  const start = performance.now();
 
   const commandEncoder = device.createCommandEncoder();
 
@@ -344,10 +382,37 @@ function update() {
   const commands = commandEncoder.finish();
   device.queue.submit([commands]);
 
+  const cpuTime = performance.now() - start;
+  times.general['cpu time'] = cpuTime.toFixed(2) + 'ms';
+
+  for (const engine2 in engines) {
+    if (engine == engine2) {
+      engines[engine2].updateDisplays(times[engine2]);
+    } else {
+      engines[engine2].cancelDisplays();
+    }
+  }
+
+  readTimestamp('render').then((time) => {
+    times.general['render time'] = time.toFixed(2) + 'ms';
+  });
+
+  let timeContent = '';
+  for (const sim in times) {
+    for (const time in times[sim]) {
+      if (times[sim][time]) {
+        timeContent += `${time}: ${times[sim][time]} <br>`;
+      }
+    }
+  }
+
+  timesDisplay.innerHTML = timeContent;
+
   fpsc++;
 }
 
 requestAnimationFrame(update);
+// setInterval(update, 1000 / 60);
 
 const particleAmtI = document.getElementById(
   'particle-amount',
@@ -371,3 +436,18 @@ setInterval(() => {
   fpsDisplay.textContent = `FPS: ${fpsc}`;
   fpsc = 0;
 }, 1000);
+
+const engineSelect = document.getElementById('engine') as HTMLSelectElement;
+
+engineSelect.onchange = () => {
+  engine = engineSelect.value;
+  for (const sim in times) {
+    if (sim == 'general') continue;
+    for (const time in times[sim]) {
+      times[sim][time] = engine == sim ? 'a' : '';
+    }
+    if (engine != sim) {
+      engines[sim].cancelDisplays();
+    }
+  }
+};
