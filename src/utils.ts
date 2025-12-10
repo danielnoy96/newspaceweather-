@@ -114,8 +114,8 @@ export async function requestTimestamps(adapter: GPUAdapter) {
   canTimestamp = adapter.features.has('timestamp-query');
 
   const urlParams = new URLSearchParams(window.location.search);
-  const flag = urlParams.get('noTimestamp');
-  if (flag == 'true') {
+  const flag = urlParams.has('noTimestamp');
+  if (flag) {
     canTimestamp = false;
   }
 

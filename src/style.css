@@ -25,6 +25,7 @@ canvas {
   height: 50px;
   filter: drop-shadow(0 0 5px purple) drop-shadow(0 0 10px purple);
   transition: scale 0.25s ease;
+  display: none;
 }
 
 #githubBtn:hover {

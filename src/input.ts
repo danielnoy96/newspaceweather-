@@ -2,7 +2,11 @@ export const mouse = { x: 0, y: 0, down: 0, type: 1 };
 
 export const keys: Record<string, boolean> = {};
 
+const urlParams = new URLSearchParams(window.location.search);
+export const isSample = urlParams.has('sample');
+
 const githubBtn = document.getElementById('githubBtn') as HTMLAnchorElement;
+if (!isSample) githubBtn.style.display = 'block';
 githubBtn.onmousedown = (event) => {
   event.stopPropagation();
 };

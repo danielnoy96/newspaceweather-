@@ -1,6 +1,6 @@
 import { Pane } from 'tweakpane';
 
-import { tcamera, mouse } from './input';
+import { tcamera, mouse, isSample } from './input';
 import renderShaders from './render.wgsl?raw';
 import {
   hslToRgb,
@@ -196,7 +196,10 @@ const globalPerformanceParams = {
   graph: 0,
 };
 
-const performanceTimes = pane.addFolder({ title: 'Performance Times' });
+const performanceTimes = pane.addFolder({
+  title: 'Performance Times',
+  expanded: !isSample,
+});
 const engineFolders: Record<string, FolderApi> = {};
 
 // folder.addBinding(performanceParams, 'countingSort');
@@ -582,9 +585,8 @@ function update() {
   device.popErrorScope().then((error) => {
     if (error) {
       // some weird bug happened with timestamps, just disable it and restart the simulation
-      const url = new URL(window.location.href);
-      url.searchParams.set('noTimestamp', 'true');
-      window.location.href = url.toString();
+      window.location.href +=
+        (window.location.search ? '&' : '?') + 'noTimestamp';
     }
   });
 
