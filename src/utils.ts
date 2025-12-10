@@ -112,10 +112,22 @@ const timestamps: Record<
 
 export async function requestTimestamps(adapter: GPUAdapter) {
   canTimestamp = adapter.features.has('timestamp-query');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const flag = urlParams.get('noTimestamp');
+  if (flag == 'true') {
+    canTimestamp = false;
+  }
+
   if (canTimestamp) {
-    return await adapter.requestDevice({
+    const device = await adapter.requestDevice({
       requiredFeatures: ['timestamp-query'],
     });
+    if (!device.features.has('timestamp-query')) {
+      canTimestamp = false;
+      return device;
+    }
+    return device;
   } else {
     return await adapter.requestDevice();
   }
@@ -123,11 +135,12 @@ export async function requestTimestamps(adapter: GPUAdapter) {
 
 export function setupTimestamp(device: GPUDevice, name: string) {
   if (!canTimestamp) return;
+  const querySet = device.createQuerySet({
+    type: 'timestamp',
+    count: 2,
+  });
   timestamps[name] = {
-    querySet: device.createQuerySet({
-      type: 'timestamp',
-      count: 2,
-    }),
+    querySet,
     resolveBuffer: device.createBuffer({
       size: 2 * 8,
       usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
@@ -140,7 +153,11 @@ export function setupTimestamp(device: GPUDevice, name: string) {
   };
 }
 
-export function linkComputeTimestamp(name: string): GPUComputePassDescriptor {
+export function linkComputeTimestamp(
+  device: GPUDevice,
+  name: string,
+): GPUComputePassDescriptor {
+  device.pushErrorScope('validation');
   if (!canTimestamp) {
     return {};
   }
@@ -154,9 +171,11 @@ export function linkComputeTimestamp(name: string): GPUComputePassDescriptor {
 }
 
 export function linkRenderTimestamp(
+  device: GPUDevice,
   description: GPURenderPassDescriptor,
   name: string,
 ): GPURenderPassDescriptor {
+  device.pushErrorScope('validation');
   if (!canTimestamp) {
     return description;
   }
@@ -171,9 +190,19 @@ export function linkRenderTimestamp(
 }
 
 export function resolveTimestamp(
+  device: GPUDevice,
   commandEncoder: GPUCommandEncoder,
   name: string,
 ) {
+  void device;
+  // device.popErrorScope().then((error) => {
+  //   if (error) {
+  //     console.log(
+  //       `Validation error during Pass execution for ${name}:`,
+  //       error.message,
+  //     );
+  //   }
+  // });
   if (!canTimestamp) return;
   commandEncoder.resolveQuerySet(
     timestamps[name].querySet,

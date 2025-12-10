@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
-    "@types/dat.gui": "^0.7.13",
+    "@tweakpane/core": "^2.0.5",
     "@webgpu/types": "^0.1.66",
     "eslint": "^9.34.0",
     "eslint-config-prettier": "^10.1.8",
@@ -26,6 +26,6 @@
     "vite": "npm:rolldown-vite@7.1.14"
   },
   "dependencies": {
-    "dat.gui": "^0.7.9"
+    "tweakpane": "^4.0.5"
   }
 }

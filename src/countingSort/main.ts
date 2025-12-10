@@ -277,6 +277,7 @@ export function start(
 }
 
 export function tick(
+  device: GPUDevice,
   commandEncoder: GPUCommandEncoder,
   alternate: number,
   particleAmt: number,
@@ -298,77 +299,60 @@ export function tick(
   commandEncoder.copyBufferToBuffer(zeroBuffer, countBuffer);
 
   const cellPassEncoder = commandEncoder.beginComputePass(
-    linkComputeTimestamp('cell'),
+    linkComputeTimestamp(device, 'cell'),
   );
   cellPassEncoder.setPipeline(cellPipeline);
   cellPassEncoder.setBindGroup(0, cellBindGroups[alternate]);
   cellPassEncoder.dispatchWorkgroups(Math.ceil(particleAmt / workgroupSize));
   cellPassEncoder.end();
-  resolveTimestamp(commandEncoder, 'cell');
+  resolveTimestamp(device, commandEncoder, 'cell');
 
   //
 
   const prefixPassEncoder = commandEncoder.beginComputePass(
-    linkComputeTimestamp('prefix'),
+    linkComputeTimestamp(device, 'prefix'),
   );
   prefixPassEncoder.setPipeline(prefixPipeline);
   prefixPassEncoder.setBindGroup(0, prefixBindGroup);
   prefixPassEncoder.dispatchWorkgroups(1);
   prefixPassEncoder.end();
-  resolveTimestamp(commandEncoder, 'prefix');
+  resolveTimestamp(device, commandEncoder, 'prefix');
 
   //
 
   const sortPassEncoder = commandEncoder.beginComputePass(
-    linkComputeTimestamp('sort'),
+    linkComputeTimestamp(device, 'sort'),
   );
   sortPassEncoder.setPipeline(sortPipeline);
   sortPassEncoder.setBindGroup(0, sortBindGroup);
   sortPassEncoder.dispatchWorkgroups(Math.ceil(particleAmt / workgroupSize));
   sortPassEncoder.end();
-  resolveTimestamp(commandEncoder, 'sort');
+  resolveTimestamp(device, commandEncoder, 'sort');
 
   //
 
   const simPassEncoder = commandEncoder.beginComputePass(
-    linkComputeTimestamp('countSim'),
+    linkComputeTimestamp(device, 'countSim'),
   );
   simPassEncoder.setPipeline(simPipeline);
   simPassEncoder.setBindGroup(0, simBindGroups[alternate]);
   simPassEncoder.dispatchWorkgroups(Math.ceil(particleAmt / workgroupSize));
   simPassEncoder.end();
 
-  resolveTimestamp(commandEncoder, 'countSim');
+  resolveTimestamp(device, commandEncoder, 'countSim');
 }
 
-let cancel = false;
-
-export function updateDisplays(times: Record<string, string>) {
-  cancel = false;
+export function updateDisplays(params: Record<string, number>) {
   readTimestamp('cell').then((time) => {
-    if (cancel) return;
-    times['cell time'] = time.toFixed(2) + 'ms';
+    params.cell = time;
   });
   readTimestamp('prefix').then((time) => {
-    if (cancel) return;
-    times['prefix time'] = time.toFixed(2) + 'ms';
+    params.prefix = time;
   });
   readTimestamp('sort').then((time) => {
-    if (cancel) return;
-    times['sort time'] = time.toFixed(2) + 'ms';
+    params.sort = time;
   });
   readTimestamp('countSim').then((time) => {
-    if (cancel) return;
-    times['sim time'] = time.toFixed(2) + 'ms';
+    params.sim = time;
   });
-  if (cancel) return;
 }
-
-export function cancelDisplays() {
-  cancel = true;
-}
-
-setInterval(() => {
-  if (!device) return;
-  // logBufferu32(device, indicesBuffer, 2000 * 4);
-}, 1000);

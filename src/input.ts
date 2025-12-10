@@ -97,8 +97,12 @@ window.addEventListener(
 
 window.addEventListener('keydown', (event) => {
   keys[event.code] = true;
+
+  if (event.code == 'ShiftLeft' && mouse.down == 1) mouse.down = 2;
 });
 
 window.addEventListener('keyup', (event) => {
   delete keys[event.code];
+
+  if (event.code == 'ShiftLeft' && mouse.down == 2) mouse.down = 1;
 });

@@ -8,6 +8,10 @@ struct Sim {
     dt: f32,
     cellSize: f32,
     cellAmt: f32,
+    avoidance: f32,
+    worldSize: f32,
+    border: f32,
+    vortex: f32,
 }
 
 struct Particle {

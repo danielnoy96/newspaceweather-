@@ -79,32 +79,25 @@ export function start(
 }
 
 export function tick(
+  device: GPUDevice,
   commandEncoder: GPUCommandEncoder,
   alternate: number,
   particleAmt: number,
 ) {
   if (!pipeline || !bindGroups) return;
   const passEncoder = commandEncoder.beginComputePass(
-    linkComputeTimestamp('compute'),
+    linkComputeTimestamp(device, 'compute'),
   );
   passEncoder.setPipeline(pipeline);
   passEncoder.setBindGroup(0, bindGroups[alternate]);
   passEncoder.dispatchWorkgroups(Math.ceil(particleAmt / workgroupSize));
   passEncoder.end();
 
-  resolveTimestamp(commandEncoder, 'compute');
+  resolveTimestamp(device, commandEncoder, 'compute');
 }
 
-let cancel = false;
-
-export function updateDisplays(times: Record<string, string>) {
-  cancel = false;
+export function updateDisplays(params: Record<string, number>) {
   readTimestamp('compute').then((time) => {
-    if (cancel) return;
-    times['gpu time'] = time.toFixed(2) + 'ms';
+    params.sim = time;
   });
-}
-
-export function cancelDisplays() {
-  cancel = true;
 }

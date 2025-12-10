@@ -1,7 +1,8 @@
 
 struct Uniforms {
     aspect: f32,
-    mouse: vec4<f32>
+    mouse: vec4<f32>,
+    size: f32
 }
 
 struct Camera {
@@ -35,7 +36,7 @@ fn vertex(
         vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)
     );
 
-    let offset = positions[vertexIndex] * 0.005 / 2;
+    let offset = positions[vertexIndex] * max(uniforms.size, 0.003 / camera.zoom);
     let worldPos = particle.pos + offset;
 
     var output: VertexOutput;

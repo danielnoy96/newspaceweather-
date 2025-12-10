@@ -184,6 +184,7 @@ export function start(
 }
 
 export function tick(
+  device: GPUDevice,
   commandEncoder: GPUCommandEncoder,
   alternate: number,
   particleAmt: number,
@@ -201,7 +202,7 @@ export function tick(
   commandEncoder.copyBufferToBuffer(headsInitBuffer, headsBuffer);
 
   const constructPassEncoder = commandEncoder.beginComputePass(
-    linkComputeTimestamp('construct'),
+    linkComputeTimestamp(device, 'construct'),
   );
   constructPassEncoder.setPipeline(constructPipeline);
   constructPassEncoder.setBindGroup(0, constructBindGroups[alternate]);
@@ -210,33 +211,24 @@ export function tick(
   );
   constructPassEncoder.end();
 
-  resolveTimestamp(commandEncoder, 'construct');
+  resolveTimestamp(device, commandEncoder, 'construct');
 
   const simPassEncoder = commandEncoder.beginComputePass(
-    linkComputeTimestamp('sim'),
+    linkComputeTimestamp(device, 'sim'),
   );
   simPassEncoder.setPipeline(simPipeline);
   simPassEncoder.setBindGroup(0, simBindGroups[alternate]);
   simPassEncoder.dispatchWorkgroups(Math.ceil(particleAmt / workgroupSize));
   simPassEncoder.end();
 
-  resolveTimestamp(commandEncoder, 'sim');
+  resolveTimestamp(device, commandEncoder, 'sim');
 }
 
-let cancel = false;
-
-export function updateDisplays(times: Record<string, string>) {
-  cancel = false;
+export function updateDisplays(params: Record<string, number>) {
   readTimestamp('construct').then((time) => {
-    if (cancel) return;
-    times['construct time'] = time.toFixed(2) + 'ms';
+    params.construct = time;
   });
   readTimestamp('sim').then((time) => {
-    if (cancel) return;
-    times['sim time'] = time.toFixed(2) + 'ms';
+    params.sim = time;
   });
-}
-
-export function cancelDisplays() {
-  cancel = true;
 }

@@ -1,13 +1,9 @@
 
-@font-face {
-  font-family: font;
-  src: url(/font.woff2);
-  font-display: block;
-}
-
 body {
-  font-family: font;
+  font-family: monospace;
   background-color: black;
+  overflow: hidden;
+  font-weight: 500;
 }
 
 canvas {
@@ -18,10 +14,10 @@ canvas {
   height: 100%;
 }
 
-a {
+#githubBtn {
   position: absolute;
   z-index: 2;
-  right: 10px;
+  left: 10px;
   top: 10px;
   background-image: url(/github.png);
   background-size: cover;
@@ -31,7 +27,7 @@ a {
   transition: scale 0.25s ease;
 }
 
-a:hover {
+#githubBtn:hover {
   scale: 1.1;
 }
 
@@ -39,68 +35,45 @@ a:hover {
   position: absolute;
   z-index: 2;
   left: 10px;
-  top: 10px;
-  background-color: rgba(50, 50, 50, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.75);
+  bottom: 10px;
+  background-color: hsla(0, 0%, 15%, 0.8);
   border-radius: 20px;
   padding: 10px;
   color: white;
   line-height: 5px;
-  padding-top: 0;
+  padding-top: 5px;
 }
 
-h2 {
-  font-size: 20px;
-  text-shadow: 0 2px grey, 0 0 4px black, 0 2px 4px black;
-}
-
-h5 {
+#controls h2 {
   font-size: 15px;
-  text-shadow: 0 1.5px grey, 0 0 3px black, 0 1.5px 3px black;
-  line-height: 18px;
-  margin-top: 0;
-  margin-bottom: 10px;
 }
 
-p {
-  font-size: 15px;
-  text-shadow: 0 1.5px grey, 0 0 3px black, 0 1.5px 3px black;
-  line-height: 20px;
+#controls p {
+  font-size: 12px;
+  line-height: 15px;
   margin-bottom: 0;
 }
 
-#particle-amount {
-  font-family: font;
-  background-color: rgba(50, 50, 50, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.75);
-  border-radius: 10px;
-  padding-left: 5px;
-  color: white;
-}
-
-button {
-  font-family: font;
-  color: white;
-  background-color: rgba(0, 255, 0, 0.5);
-  border: 2px solid rgba(0, 255, 0, 0.75);
-  text-shadow: 0 1.5px grey, 0 0 3px black, 0 1.5px 3px black;
-  border-radius: 10px;
-  transition: scale 0.2s ease;
-}
-
-button:hover {
-  scale: 0.95;
-}
-
-button:active {
-  scale: 0.85;
-}
-
-select {
-  width: 100%;
-  border-radius: 10px;
-  font-family: font;
-  background-color: rgba(50, 50, 50, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.75);
-  color: white;
+:root {
+  --tp-base-background-color: hsla(0, 0%, 15%, 0.80);
+  --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+  --tp-button-background-color: hsla(0, 0%, 80%, 1);
+  --tp-button-background-color-active: hsla(0, 0%, 100%, 1);
+  --tp-button-background-color-focus: hsla(0, 0%, 95%, 1);
+  --tp-button-background-color-hover: hsla(0, 0%, 85%, 1);
+  --tp-button-foreground-color: hsla(0, 0%, 0%, 0.8);
+  --tp-container-background-color: hsla(0, 0%, 0%, 0.3);
+  --tp-container-background-color-active: hsla(0, 0%, 0%, 0.6);
+  --tp-container-background-color-focus: hsla(0, 0%, 0%, 0.5);
+  --tp-container-background-color-hover: hsla(0, 0%, 0%, 0.4);
+  --tp-container-foreground-color: hsla(0, 0%, 100%, 0.5);
+  --tp-groove-foreground-color: hsla(0, 0%, 0%, 0.2);
+  --tp-input-background-color: hsla(0, 0%, 0%, 0.3);
+  --tp-input-background-color-active: hsla(0, 0%, 0%, 0.6);
+  --tp-input-background-color-focus: hsla(0, 0%, 0%, 0.5);
+  --tp-input-background-color-hover: hsla(0, 0%, 0%, 0.4);
+  --tp-input-foreground-color: hsla(0, 0%, 100%, 0.5);
+  --tp-label-foreground-color: hsla(0, 0%, 100%, 0.5);
+  --tp-monitor-background-color: hsla(0, 0%, 0%, 0.3);
+  --tp-monitor-foreground-color: hsla(0, 0%, 100%, 0.50);
 }

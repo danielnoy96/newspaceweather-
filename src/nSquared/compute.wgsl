@@ -1,7 +1,8 @@
 
 struct Uniforms {
     aspect: f32,
-    mouse: vec4<f32>
+    mouse: vec4<f32>,
+    size: f32
 }
 
 struct Sim {
@@ -13,6 +14,10 @@ struct Sim {
     dt: f32,
     cellSize: f32,
     cellAmt: f32,
+    avoidance: f32,
+    worldSize: f32,
+    border: f32,
+    vortex: f32,
 }
 
 struct Particle {
@@ -82,7 +87,7 @@ fn getForce(pi: u32) -> vec2f {
             avoidForceX += rx / r * f.y;
             avoidForceY += ry / r * f.y;
 
-            div += pow(max(0, -f.y), 1) / 10;
+            div += pow(max(0, -f.y), 1) / 10 * sim.avoidance;
         }
     }
 
@@ -110,6 +115,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     p.vel.x += force.x * sim.dt;
     p.vel.y += force.y * sim.dt;
 
+    let d = sqrt(p.pos.x * p.pos.x + p.pos.y * p.pos.y) / sim.worldSize;
+
+    if (sim.vortex > 0) {
+        p.vel.x -= p.pos.x * sim.dt * 5 * cos(d * 30 * p.pos.x * p.pos.y / matrix[u32(p.colour) * 10]) * sin(p.pos.x * 10 * matrix[u32(p.colour)]);
+        p.vel.y -= p.pos.y * sim.dt * 5 * cos(d * 30 * p.pos.y * p.pos.x / matrix[u32(p.colour) * 10]) * cos(p.pos.y * 10 * matrix[u32(p.colour)]);
+
+        p.vel.x -= p.pos.y * sim.dt * 5 * pow(d / 0.5, 2) * sin(d * 10 + matrix[u32(p.colour) + 10]);
+        p.vel.y += p.pos.x * sim.dt * 5 * pow(d / 0.5, 2) * sin(d * 10 + matrix[u32(p.colour) + 10]);
+    }
+
     if (uniforms.mouse.z != 0) {
         let dx = uniforms.mouse.x - p.pos.x;
         let dy = uniforms.mouse.y - p.pos.y;
@@ -124,10 +139,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
                 p.vel.y -= dy * 3;
             }
         }
-    }
+    }   
 
-    let d = sqrt(p.pos.x * p.pos.x + p.pos.y * p.pos.y);
-    if (d > 0.9) {
+    if (sim.border > 0 && d > 0.9) {
         let f = (d - 0.9) * 10;
         p.vel.x -= p.pos.x * f;
         p.vel.y -= p.pos.y * f;
