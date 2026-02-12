@@ -8,6 +8,7 @@ import {
   resolveTimestamp,
   setupTimestamp,
 } from '../utils';
+import { SIM_MODE, SIM_MODE_ID } from '../simMode';
 
 const workgroupSize = 64;
 
@@ -23,6 +24,9 @@ export function setup(device: GPUDevice) {
     compute: {
       module,
       entryPoint: 'main',
+      constants: {
+        SIM_MODE: SIM_MODE_ID[SIM_MODE],
+      },
     },
   });
 }

@@ -251,6 +251,7 @@ function startParticles() {
 
   alternate = 0;
   const data = new Float32Array(bufferSize / 4);
+  const ageWrapSeconds = 240;
   let pi = 0;
   while (pi < particleAmt) {
     const spawnAmt = ((Math.random() * (particleAmt - pi)) / colourAmt) * 5;
@@ -270,7 +271,8 @@ function startParticles() {
       data[pi * 6 + 3] = 0;
       data[pi * 6 + 4] = c;
 
-      data[pi * 6 + 5] = 0;
+      // ageSeconds (stored in the previously-unused 6th float)
+      data[pi * 6 + 5] = Math.random() * ageWrapSeconds;
 
       pi++;
     }

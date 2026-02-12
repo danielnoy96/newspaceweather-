@@ -24,7 +24,24 @@ struct Particle {
     pos: vec2f,
     vel: vec2f,
     colour: f32,
+    ageSeconds: f32,
 }
+
+override SIM_MODE: u32 = 1u;
+const SIM_MODE_LIFE: u32 = 0u;
+const SIM_MODE_BASELINE: u32 = 1u;
+
+const AGE_WRAP_SECONDS: f32 = 240.0;
+
+const BASELINE_RADIAL_K: f32 = 3.0;
+const BASELINE_RADIAL_OUTER_FRAC: f32 = 0.95;
+const BASELINE_RADIAL_INNER_FRAC: f32 = 0.15;
+
+const BASELINE_INWARD_STRENGTH: f32 = 0.2;
+const BASELINE_DRAG: f32 = 0.02;
+const BASELINE_WALL_RESTITUTION: f32 = 0.4;
+const BASELINE_WALL_DAMP: f32 = 0.9;
+const BASELINE_JITTER: f32 = 0.02;
 
 struct ListParticle {
     idx: f32,
@@ -58,6 +75,12 @@ struct Force {
 
 @group(0) @binding(5) var<storage, read> heads: Heads;
 @group(0) @binding(6) var<storage, read> linkedList: LinkedList;
+
+fn rand2(seed: vec2f) -> vec2f {
+    let a = fract(sin(dot(seed, vec2f(12.9898, 78.233))) * 43758.5453);
+    let b = fract(sin(dot(seed, vec2f(39.3468, 11.135))) * 24634.6345);
+    return vec2f(a, b) * 2.0 - 1.0;
+}
 
 fn hash3i(k: vec3<i32>) -> u32 {
     let offset: u32 = 0x80000000u;
@@ -174,6 +197,56 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
     var p  = input[global_id.x];
+
+    p.ageSeconds += sim.dt;
+    if (p.ageSeconds >= AGE_WRAP_SECONDS) {
+        p.ageSeconds -= AGE_WRAP_SECONDS;
+    }
+
+    if (SIM_MODE == SIM_MODE_BASELINE) {
+        let dt = sim.dt;
+        let radius = sim.worldSize;
+        let rOuter = radius * BASELINE_RADIAL_OUTER_FRAC;
+        let rInner = radius * BASELINE_RADIAL_INNER_FRAC;
+        let t = p.ageSeconds / AGE_WRAP_SECONDS;
+        let rTarget = rOuter + (rInner - rOuter) * t;
+
+        var pos = p.pos;
+        var vel = p.vel;
+
+        let r = length(pos);
+        var dir = vec2f(1.0, 0.0);
+        if (r > 1e-6) {
+            dir = pos / r;
+        }
+
+        var acc = vec2f(0.0);
+        acc += dir * ((rTarget - r) * BASELINE_RADIAL_K);
+        acc += (-dir) * BASELINE_INWARD_STRENGTH;
+
+        acc += rand2(vec2f(f32(global_id.x), p.ageSeconds)) * BASELINE_JITTER;
+
+        vel += acc * dt;
+        vel *= 1.0 - BASELINE_DRAG;
+        pos += vel * dt;
+
+        let r2 = length(pos);
+        if (r2 > radius) {
+            let n = pos / r2;
+            pos = n * radius;
+
+            let vn = dot(vel, n);
+            if (vn > 0.0) {
+                vel -= (1.0 + BASELINE_WALL_RESTITUTION) * vn * n;
+            }
+            vel *= BASELINE_WALL_DAMP;
+        }
+
+        p.pos = pos;
+        p.vel = vel;
+        output[global_id.x] = p;
+        return;
+    }
 
     let mx = uniforms.mouse.x;
 

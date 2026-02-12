@@ -9,6 +9,7 @@ import cellShader from './cell.wgsl?raw';
 import prefixShader from './prefix.wgsl?raw';
 import sortShader from './sort.wgsl?raw';
 import simShader from './sim.wgsl?raw';
+import { SIM_MODE, SIM_MODE_ID } from '../simMode';
 
 const workgroupSize = 128;
 
@@ -92,6 +93,9 @@ export function setup(device2: GPUDevice) {
     compute: {
       module: simModule,
       entryPoint: 'main',
+      constants: {
+        SIM_MODE: SIM_MODE_ID[SIM_MODE],
+      },
     },
   });
 }

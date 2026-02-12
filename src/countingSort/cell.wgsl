@@ -18,6 +18,7 @@ struct Particle {
     pos: vec2f,
     vel: vec2f,
     colour: f32,
+    ageSeconds: f32,
 }
 
 struct SortParticle {

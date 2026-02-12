@@ -6,6 +6,7 @@ import {
   resolveTimestamp,
   setupTimestamp,
 } from '../utils';
+import { SIM_MODE, SIM_MODE_ID } from '../simMode';
 
 let constructPipeline: GPUComputePipeline | undefined;
 let simPipeline: GPUComputePipeline | undefined;
@@ -46,6 +47,9 @@ export function setup(device: GPUDevice) {
     compute: {
       module: simModule,
       entryPoint: 'main',
+      constants: {
+        SIM_MODE: SIM_MODE_ID[SIM_MODE],
+      },
     },
   });
 }
